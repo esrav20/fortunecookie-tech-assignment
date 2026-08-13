@@ -5,6 +5,7 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
   
   backend:
     build:
@@ -12,6 +13,8 @@ services:
       dockerfile: Dockerfile
     ports: 
       - "9000:9000"
+    environment:
+      - REDIS_DNS = redis 
     depends_on:
       - redis
 
