@@ -14,7 +14,7 @@ services:
     ports: 
       - "9000:9000"
     environment:
-      - REDIS_DNS = redis 
+      - REDIS_DNS=redis 
     depends_on:
       - redis
 
