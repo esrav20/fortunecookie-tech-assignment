@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fortunecookie-frontend
+  labels:
+    app: fortunecookie-frontend
+spec:
+  selector:
+    matchLabels:
+      app: fortunecookie-frontend
+  template:
+    metadata:
+      labels:
+        app: fortunecookie-frontend
+    spec:
+      containers:
+      - name: fortunecookie-frontend
+        image: ravnefar/fortunecookie-frontend:latest
+        ports:
+          - containerPort: 8080
+        env:
+          - name: BACKEND_DNS
+            value: "backend"
+          - name: BACKEND_PORT
+            value: "9000"
