@@ -73,31 +73,15 @@ jobs:
           tags: ${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:${{ github.sha }},${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:latest
 
   deploy:
-    name: Deploy
+    name: Deploy to Kubernetes
     runs-on: ubuntu-latest
     needs: publish
     steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Pull newly built images
-        run: |
-          docker pull ${{ env.IMAGE_NAMESPACE }}/fortunecookie-backend:${{ github.sha }}
-          docker pull ${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:${{ github.sha }}
+      - name: Set up Kubernetes Config
+        run: echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig
 
-      - name: Run backend
-        run: |
-          docker network create fortunecookie-net || true
-          docker run -d --name backend --network fortunecookie-net \
-            ${{ env.IMAGE_NAMESPACE }}/fortunecookie-backend:${{ github.sha }}
-
-      - name: Run frontend
-        run: |
-          docker run -d --name frontend --network fortunecookie-net \
-            -e BACKEND_DNS=backend -e BACKEND_PORT=9000 \
-            -p 8080:8080 \
-            ${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:${{ github.sha }}
-    
+      - name: Deploy manifests to Kubernetes 
+        run: kubectl --kubeconfig kubeconfig apply -f kubernetes/
