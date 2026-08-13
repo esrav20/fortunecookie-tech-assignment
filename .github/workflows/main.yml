@@ -1,10 +1,13 @@
 name: Main Workflow
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+    
+env:
+  REGISTRY: docker.io
+  IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
   backend:
@@ -38,3 +41,63 @@ jobs:
       - name: Test
         working-directory: frontend
         run: go test ./... -v
+        
+  publish:
+    name: Publish image
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build & push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ env.IMAGE_NAMESPACE }}/fortunecookie-backend:${{ github.sha }},${{ env.IMAGE_NAMESPACE }}/fortunecookie-backend:latest
+
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:${{ github.sha }},${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:latest
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: publish
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull newly built images
+        run: |
+          docker pull ${{ env.IMAGE_NAMESPACE }}/fortunecookie-backend:${{ github.sha }}
+          docker pull ${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:${{ github.sha }}
+
+      - name: Run backend
+        run: |
+          docker network create fortunecookie-net || true
+          docker run -d --name backend --network fortunecookie-net \
+            ${{ env.IMAGE_NAMESPACE }}/fortunecookie-backend:${{ github.sha }}
+
+      - name: Run frontend
+        run: |
+          docker run -d --name frontend --network fortunecookie-net \
+            -e BACKEND_DNS=backend -e BACKEND_PORT=9000 \
+            -p 8080:8080 \
+            ${{ env.IMAGE_NAMESPACE }}/fortunecookie-frontend:${{ github.sha }}
+    
